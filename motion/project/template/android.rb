@@ -362,7 +362,8 @@ EOS
     end
 
     # copy over libc++_shared.so to the build directory for apk bundling
-    sh "cp \"#{App.config.ndk_path}/sources/cxx-stl/llvm-libc++/libs/#{App.config.armeabi_directory_name(arch)}/libc++_shared.so\" \"#{app_build_dir}/#{libs_abi_subpath}/libc++_shared.so\""
+    sh "cp \"#{App.config.ndk_path}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so\" \"#{app_build_dir}/#{libs_abi_subpath}/libc++_shared.so\""
+    sh "cp -R ./assets/ #{File.join app_build_dir, "obj", "assets/"}"
     libpayload_subpaths << "#{libs_abi_subpath}/libc++_shared.so"
 
     # Copy the gdb server.
@@ -581,7 +582,8 @@ EOS
     main_dex_list_path = File.join(app_build_dir, 'main-dex-list.txt')
     File.open(main_dex_list_path, 'w') { |io| io.write(main_dex_list) }
     App.info 'Create', 'dex files'
-    sh "\"#{App.config.build_tools_dir}/dx\" -JXmx2048m --dex --no-strict --multi-dex --main-dex-list \"#{main_dex_list_path}\" --output \"#{app_build_dir}\" \"#{classes_dir}\" \"#{App.config.sdk_path}/tools/support/annotations.jar\" #{vendored_jars.compact.map{ |x| "'#{x}'" }.join(' ')}"
+    dx_binary_location = App.config.sdk_path + "/build-tools/30.0.0" + "/dx"
+    sh "\"#{dx_binary_location}\" -JXmx2048m --dex --no-strict --multi-dex --main-dex-list \"#{main_dex_list_path}\" --output \"#{app_build_dir}\" \"#{classes_dir}\" \"#{App.config.sdk_path}/tools/support/annotations.jar\" #{vendored_jars.compact.map{ |x| "'#{x}'" }.join(' ')}"
   else
     dex_classes = File.join(app_build_dir, 'classes.dex')
     if !File.exist?(dex_classes) \
@@ -589,7 +591,8 @@ EOS
         or classes_changed \
         or vendored_jars.any? { |x| File.mtime(x) > File.mtime(dex_classes) }
       App.info 'Create', dex_classes
-      sh "\"#{App.config.build_tools_dir}/dx\" -JXmx2048m --dex --no-strict --incremental --output \"#{dex_classes}\" \"#{classes_dir}\" \"#{App.config.sdk_path}/tools/support/annotations.jar\" #{vendored_jars.compact.map{ |x| "'#{x}'" }.join(' ')}"
+      dx_binary_location = App.config.sdk_path + "/build-tools/30.0.0" + "/dx"
+      sh "\"#{dx_binary_location}\" -JXmx2048m --dex --no-strict --incremental --output \"#{dex_classes}\" \"#{classes_dir}\" \"#{App.config.sdk_path}/tools/support/annotations.jar\" #{vendored_jars.compact.map{ |x| "'#{x}'" }.join(' ')}"
     end
   end
 
@@ -645,7 +648,7 @@ EOS
       FileUtils.rm(archive) if File.exist?(archive)
       # Generate the AAB file.
       sh "\"#{App.config.build_tools_dir}/aapt2\" compile --dir resources -o \"#{File.join(app_build_dir, 'obj', 'res.zip')}\""
-      sh "\"#{App.config.build_tools_dir}/aapt2\" link --proto-format -o \"#{File.join(app_build_dir, 'obj', 'linked.zip')}\" -I \"#{android_jar}\" --manifest \"#{android_manifest}\" --java src \"#{File.join(app_build_dir, 'obj', 'res.zip')}\" --auto-add-overlay"
+      sh "\"#{App.config.build_tools_dir}/aapt2\" link --proto-format #{aapt_assets_flags}  -o \"#{File.join(app_build_dir, 'obj', 'linked.zip')}\" -I \"#{android_jar}\" --manifest \"#{android_manifest}\" --java src \"#{File.join(app_build_dir, 'obj', 'res.zip')}\" --auto-add-overlay"
       Dir.chdir(File.join(app_build_dir, 'obj')) do
         sh "/usr/bin/jar xf linked.zip resources.pb AndroidManifest.xml res"
         mkdir_p "dex"
@@ -662,7 +665,7 @@ EOS
           line << " > /dev/null" unless Rake.application.options.trace
           sh line
         end
-        sh "/usr/bin/jar cMf base.zip manifest dex res lib resources.pb"
+        sh "/usr/bin/jar cMf base.zip manifest dex res lib assets resources.pb"
       end
       sh "/usr/local/bin/bundletool build-bundle --modules=\"#{File.join(app_build_dir, 'obj', 'base.zip')}\" --output=\"#{archive}\""
 
@@ -853,7 +856,7 @@ namespace 'emulator' do
   end
 
   task :build do
-    App.config.archs = ['x86'] # Build x86 binary only for emulator
+    App.config.archs = ['x86', 'arm64-v8a'] # Build x86 and arm binary for emulators (arm added for M1/M2 macs)
     Rake::Task["build"].invoke
   end
 end

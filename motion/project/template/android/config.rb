@@ -107,7 +107,7 @@ module Motion; module Project
       super
       @main_activity = 'MainActivity'
       @sub_activities = []
-      @archs = ['armv7']
+      @archs = ['arm64-v8a', 'x86']
       @assets_dirs = [File.join(project_dir, 'assets')]
       @vendored_projects = []
       @permissions = []
@@ -162,6 +162,7 @@ module Motion; module Project
         application.add_child('activity') do |activity|
           activity['android:name'] = -> { main_activity }
           activity['android:label'] = -> { name }
+          activity['android:exported'] = -> { 'true' }
           activity.add_child('intent-filter') do |filter|
             filter.add_child('action', 'android:name' => 'android.intent.action.MAIN')
             filter.add_child('category', 'android:name' => 'android.intent.category.LAUNCHER')
@@ -302,9 +303,9 @@ module Motion; module Project
     def toolchain_flags(arch)
       case common_arch(arch)
         when 'arm'
-          "-marm -target armv7-none-linux-androideabi#{api_version_ndk} "
+          "-target armv7-none-linux-androideabi#{api_version_ndk} "
         when 'arm64'
-          "-marm -target arm64-v8a-linux-androideabi#{api_version_ndk}"
+          "-target arm64-v8a-linux-androideabi#{api_version_ndk}"
         when 'x86'
           "-target i686-none-linux-android#{api_version_ndk} "
         else
@@ -319,7 +320,7 @@ module Motion; module Project
           if arch == 'armv5te'
             archflags << "-march=armv5te "
           elsif arch == 'armv7'
-            archflags << "-march=armv7a -mfpu=vfpv3-d16 "
+            archflags << "-march=armv7a "
           end
         when 'x86'
           # Nothing.
@@ -342,7 +343,7 @@ module Motion; module Project
     end
 
     def cxxflags(arch)
-      "#{cflags(arch)} -std=c++14 -I\"#{ndk_path}/sources/cxx-stl/stlport/stlport\""
+      "#{cflags(arch)} -std=c++14 -stdlib=libstdc++ "
     end
 
     def appt_flags
@@ -374,11 +375,11 @@ module Motion; module Project
     def ldlibs_pre(arch)
       # The order of the libraries matters here.
       # -B controls where the linker will look for the crtbegin_so/crtend files
-      "-B\"#{ndk_path}/platforms/android-#{api_version_ndk}/arch-#{common_arch(arch)}/usr/lib\" -L\"#{ndk_path}/platforms/android-#{api_version_ndk}/arch-#{common_arch(arch)}/usr/lib\" -lc++ -lc -lm -llog -L\"#{versioned_arch_datadir(arch)}\" -lrubymotion-static"
+      "  -stdlib=libstdc++ -lc++ -lc -lm -llog -L\"#{versioned_arch_datadir(arch)}\" -lrubymotion-static"
     end
 
     def ldlibs_post(arch)
-      "-L#{ndk_path}/sources/cxx-stl/llvm-libc++/libs/#{armeabi_directory_name(arch)} -latomic"
+      " -latomic "
     end
 
     def armeabi_directory_name(arch)
