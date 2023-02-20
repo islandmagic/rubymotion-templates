@@ -215,7 +215,7 @@ module Motion; module Project
     #         on the bundle identifier of the host application.
     #
     def identifier
-      ENV['RM_TARGET_HOST_APP_IDENTIFIER'] + '.' + bundle_name
+      ENV['RM_TARGET_HOST_APP_IDENTIFIER'] + '.' + "#{bundle_name.gsub(/\s/, '-').downcase}"
     end
 
     def app_bundle(platform)
@@ -257,6 +257,7 @@ module Motion; module Project
         'DTPlatformBuild' => sdk_build_version(platform),
         'CFBundlePackageType' => 'XPC!'
       })
+      plist['UIRequiredDeviceCapabilities'] = ['arm64']
       plist.delete('UISupportedInterfaceOrientations')
       plist
     end
