@@ -145,8 +145,13 @@ task :build do
   # Sub-activities.
   (App.config.sub_activities.uniq - [App.config.main_activity]).each do |activity|
     App.config.manifest.child('application').add_child('activity') do |sub_activity|
-      sub_activity['android:name'] = "#{activity}"
-      sub_activity['android:label'] = "#{activity}"
+      if activity.is_a? Hash
+        sub_activity['android:name'] = "#{activity[:name]}"
+        sub_activity['android:label'] = "#{activity[:label] || activity[:name]}"
+      else
+        sub_activity['android:name'] = "#{activity}"
+        sub_activity['android:label'] = "#{activity}"
+      end
       sub_activity['android:parentActivityName'] = -> { "#{App.config.main_activity}" }
 
       sub_activity.add_child('meta-data') do |meta|
@@ -667,7 +672,7 @@ EOS
         end
         sh "/usr/bin/jar cMf base.zip manifest dex res lib assets resources.pb"
       end
-      sh "/usr/local/bin/bundletool build-bundle --modules=\"#{File.join(app_build_dir, 'obj', 'base.zip')}\" --output=\"#{archive}\""
+      sh "bundletool build-bundle --modules=\"#{File.join(app_build_dir, 'obj', 'base.zip')}\" --output=\"#{archive}\""
 
       App.info 'Sign', archive
       sh "/usr/bin/jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore \"#{keystore}\" \"#{archive}\" \"#{App.config.release_keystore_alias}\" -tsa http://sha256timestamp.ws.symantec.com/sha256/timestamp"
